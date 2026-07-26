@@ -23,6 +23,10 @@
   background: var(--surface-2);
   color: var(--text);
   transition: transform 0.05s ease, background 0.15s ease;
+  min-height: 44px; /* touch target */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn:active:not(:disabled) {
@@ -385,4 +389,54 @@
 
 .quiz__perfect {
   color: var(--good);
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .app-shell {
+    padding: 16px 12px 48px;
+  }
+
+  .app-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .input-textarea {
+    font-size: 16px; /* prevents iOS Safari auto-zoom on focus */
+  }
+
+  .flashcard__inner {
+    height: 260px;
+  }
+
+  .flashcard__face {
+    font-size: 1.05rem;
+    padding: 18px;
+  }
+
+  .flashcards__nav,
+  .flashcards__mark,
+  .flashcards__footer,
+  .quiz__summary-actions {
+    flex-direction: column;
+  }
+
+  .flashcards__nav .btn,
+  .flashcards__mark .btn,
+  .flashcards__footer .btn,
+  .quiz__summary-actions .btn {
+    width: 100%;
+  }
+
+  .results-view__header {
+    width: 100%;
+  }
+
+  .tabs {
+    overflow-x: auto;
+  }
+}
+
+.quiz-option {
+  min-height: 44px;
 }
