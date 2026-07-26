@@ -1,6 +1,7 @@
 import { useState } from "react";
 import LoadingState from "./LoadingState";
 import ErrorState from "./ErrorState";
+import { dueCardCount, formatRelativeTime } from "../storage";
 
 const EXAMPLES = [
   "Photosynthesis — light and dark reactions",
@@ -8,7 +9,16 @@ const EXAMPLES = [
   "Big-O notation and common algorithm complexities",
 ];
 
-export default function InputScreen({ input, onInputChange, onSubmit, status, errorMessage }) {
+export default function InputScreen({
+  input,
+  onInputChange,
+  onSubmit,
+  status,
+  errorMessage,
+  sessions,
+  onOpenSession,
+  onDeleteSession,
+}) {
   const [touched, setTouched] = useState(false);
   const isLoading = status === "loading";
   const trimmedEmpty = input.trim().length === 0;
@@ -73,6 +83,40 @@ export default function InputScreen({ input, onInputChange, onSubmit, status, er
 
       {status === "loading" && <LoadingState />}
       {status === "error" && <ErrorState message={errorMessage} onRetry={() => onSubmit(input)} />}
+
+      {status === "idle" && sessions.length > 0 && (
+        <div className="session-history">
+          <h3 className="session-history__title">Recent sessions</h3>
+          <ul className="session-history__list">
+            {sessions.map((s) => {
+              const due = dueCardCount(s.studySet, s.schedule);
+              return (
+                <li key={s.id} className="session-history__item">
+                  <button
+                    type="button"
+                    className="session-history__open"
+                    onClick={() => onOpenSession(s.id)}
+                  >
+                    <span className="session-history__topic">{s.topic}</span>
+                    <span className="session-history__meta">
+                      {formatRelativeTime(s.updatedAt)}
+                      {due > 0 && <span className="session-history__due"> · {due} due</span>}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="session-history__delete"
+                    aria-label={`Delete session: ${s.topic}`}
+                    onClick={() => onDeleteSession(s.id)}
+                  >
+                    ×
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

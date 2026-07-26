@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { orderCardsBySchedule, dueCardCount, boxLabel } from "../storage";
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -9,12 +10,29 @@ function shuffleArray(arr) {
   return a;
 }
 
-export default function Flashcards({ cards }) {
-  const [deck, setDeck] = useState(cards);
+// `schedule` is the session's spaced-repetition state (card id -> {box,
+// dueAt}, see storage.js). `onReview(cardId, known)` persists a review to
+// that schedule — Flashcards itself only owns same-sitting state (the
+// "known this round" map used for the review-missed loop below); the
+// cross-session spaced-repetition bookkeeping lives in storage.js and is
+// just reported here.
+export default function Flashcards({ cards, schedule, onReview }) {
+  const orderedCards = useMemo(() => orderCardsBySchedule({ flashcards: cards }, schedule), [cards, schedule]);
+
+  const [deck, setDeck] = useState(orderedCards);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [knownMap, setKnownMap] = useState({}); // card id -> true (known) | false (still learning)
+  const [knownMap, setKnownMap] = useState({}); // card id -> true (known) | false (still learning), this sitting only
   const [reviewMode, setReviewMode] = useState(false);
+
+  // If a refine changes the underlying card set, resync the deck (new
+  // cards need to appear; this also re-applies due-first ordering).
+  useEffect(() => {
+    setDeck(orderedCards);
+    setIndex(0);
+    setFlipped(false);
+    setReviewMode(false);
+  }, [orderedCards]);
 
   const total = deck.length;
   const current = deck[index];
@@ -32,6 +50,7 @@ export default function Flashcards({ cards }) {
 
   function mark(known) {
     setKnownMap((m) => ({ ...m, [current.id]: known }));
+    onReview?.(current.id, known);
     if (index < total - 1) next();
   }
 
@@ -42,7 +61,7 @@ export default function Flashcards({ cards }) {
   }
 
   function startReview() {
-    const unknownCards = cards.filter((c) => knownMap[c.id] !== true);
+    const unknownCards = orderedCards.filter((c) => knownMap[c.id] !== true);
     if (unknownCards.length === 0) return;
     setDeck(shuffleArray(unknownCards));
     setIndex(0);
@@ -51,7 +70,7 @@ export default function Flashcards({ cards }) {
   }
 
   function exitReview() {
-    setDeck(cards);
+    setDeck(orderedCards);
     setIndex(0);
     setFlipped(false);
     setReviewMode(false);
@@ -78,8 +97,10 @@ export default function Flashcards({ cards }) {
 
   const knownCount = Object.values(knownMap).filter((v) => v === true).length;
   const seenCount = Object.keys(knownMap).length;
-  const unknownCount = cards.length - knownCount;
-  const allSeen = seenCount >= cards.length;
+  const unknownCount = orderedCards.length - knownCount;
+  const allSeen = seenCount >= orderedCards.length;
+  const dueNow = dueCardCount({ flashcards: cards }, schedule);
+  const currentBox = schedule?.[current.id]?.box;
 
   return (
     <div className="flashcards">
@@ -87,6 +108,9 @@ export default function Flashcards({ cards }) {
         <span>
           {index + 1} / {total}
           {reviewMode ? " (review)" : ""}
+        </span>
+        <span className="flashcards__due" title="Cards due for spaced-repetition review">
+          {dueNow} due
         </span>
         <span>{knownCount} known</span>
       </div>
@@ -102,6 +126,10 @@ export default function Flashcards({ cards }) {
           <div className="flashcard__face flashcard__face--back">{current.back}</div>
         </div>
       </button>
+
+      {currentBox !== undefined && (
+        <p className="flashcards__box-hint">Next review in: {boxLabel(currentBox)}</p>
+      )}
 
       <div className="flashcards__nav">
         <button type="button" className="btn btn--secondary" onClick={prev}>

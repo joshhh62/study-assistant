@@ -1,5 +1,5 @@
-// Thin wrapper around the one backend endpoint we call. Kept separate from
-// components so the fetch/abort/parsing logic has one home.
+// Thin wrapper around the backend endpoints. Kept separate from components
+// so the fetch/abort/parsing logic has one home.
 
 // In local dev, Vite's proxy (see vite.config.js) forwards relative "/api/*"
 // calls to the Express server, so the default empty base works with no
@@ -16,13 +16,13 @@ export class ApiError extends Error {
   }
 }
 
-export async function generateStudySet(input, { signal } = {}) {
+async function postJson(path, payload, signal) {
   let res;
   try {
-    res = await fetch(`${API_BASE}/api/generate`, {
+    res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify(payload),
       signal,
     });
   } catch (err) {
@@ -42,4 +42,15 @@ export async function generateStudySet(input, { signal } = {}) {
   }
 
   return body.data;
+}
+
+export function generateStudySet(input, { signal } = {}) {
+  return postJson("/api/generate", { input }, signal);
+}
+
+// Refinement loop: edits an existing study set per a free-text instruction
+// instead of regenerating from scratch. currentSet is sent back to the
+// (stateless) server, which re-validates it before using it in a prompt.
+export function refineStudySet(currentSet, instruction, { signal } = {}) {
+  return postJson("/api/refine", { currentSet, instruction }, signal);
 }

@@ -440,3 +440,147 @@
 .quiz-option {
   min-height: 44px;
 }
+
+/* Refine bar */
+.refine-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 4px;
+}
+
+.refine-bar__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.refine-bar__form {
+  display: flex;
+  gap: 8px;
+}
+
+.refine-bar__input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  color: var(--text);
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.refine-bar__input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.refine-bar__error {
+  color: var(--bad);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* Flashcards: due/box hints */
+.flashcards__due {
+  color: var(--accent);
+}
+
+.flashcards__box-hint {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin: -4px 0 0;
+}
+
+/* Session history */
+.session-history {
+  margin-top: 28px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.session-history__title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
+
+.session-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-history__item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.session-history__open {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--text);
+}
+
+.session-history__open:hover {
+  border-color: var(--accent-dim);
+}
+
+.session-history__topic {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.session-history__meta {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.session-history__due {
+  color: var(--accent);
+}
+
+.session-history__delete {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  width: 40px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.session-history__delete:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+@media (max-width: 480px) {
+  .refine-bar__form {
+    flex-direction: column;
+  }
+
+  .refine-bar__form .btn {
+    width: 100%;
+  }
+}
