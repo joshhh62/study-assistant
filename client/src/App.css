@@ -1,0 +1,154 @@
+.app-shell {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+.app-header h1 {
+  font-size: 1.6rem;
+  margin: 0 0 4px;
+}
+
+.app-header p {
+  color: var(--text-dim);
+  margin: 0 0 24px;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text);
+  transition: transform 0.05s ease, background 0.15s ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: #0b0e14;
+  border-color: transparent;
+}
+
+.btn--secondary {
+  background: transparent;
+}
+
+.input-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.input-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.input-textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 14px;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 140px;
+}
+
+.input-textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.input-hint {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.input-hint--warn {
+  color: var(--bad);
+}
+
+.input-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-examples__label {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--accent-dim);
+}
+
+.input-shortcut-hint {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--text-dim);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-state {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--bad);
+  border-radius: var(--radius);
+  background: rgba(248, 113, 113, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.error-state__message {
+  margin: 0;
+  color: var(--text);
+}
+
+.results-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
