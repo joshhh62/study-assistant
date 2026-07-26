@@ -36,6 +36,37 @@ export function buildMockStudySet(topic) {
   };
 }
 
+// Mock version of a refinement: makes a visible, deterministic change so
+// MOCK_MODE=true can exercise the refine loop without a real key. Appends
+// one new card/question referencing the instruction, and tags the topic,
+// so it's obvious in the UI that a refine actually happened.
+export function buildMockRefinedStudySet(currentSet, instruction) {
+  const nextFlashcardId = `f${currentSet.flashcards.length + 1}-refined`;
+  const nextQuizId = `q${currentSet.quiz.length + 1}-refined`;
+  return {
+    ...currentSet,
+    topic: currentSet.topic.includes("(refined") ? currentSet.topic : `${currentSet.topic} (refined)`,
+    flashcards: [
+      ...currentSet.flashcards,
+      {
+        id: nextFlashcardId,
+        front: "Mock refinement applied",
+        back: `Instruction was: "${instruction}"`,
+      },
+    ],
+    quiz: [
+      ...currentSet.quiz,
+      {
+        id: nextQuizId,
+        question: `Which instruction was just applied to this set?`,
+        options: [instruction.slice(0, 60), "Nothing changed", "The set was deleted", "A new topic was generated"],
+        correctIndex: 0,
+        explanation: "This question was added by the mock refinement to prove the loop works.",
+      },
+    ],
+  };
+}
+
 // A deliberately malformed response, used by MOCK_MODE=broken to exercise
 // the error-handling path end to end (see server/src/llmClient.js).
 export function buildMockBrokenPayload() {
