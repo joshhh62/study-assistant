@@ -82,9 +82,28 @@ This project was built with substantial help from Claude (Anthropic's AI assista
 
 _Fill in your actual time before submitting_ — the brief asks for total time spent including review. As a starting point: the initial build (scaffold → backend → input screen → flashcards → quiz → mobile pass → README) took a few focused hours with AI assistance. Add whatever time you spend reading, testing, and adjusting it yourself.
 
-## Deploying (optional)
+## Deploying (optional but preferred)
 
-Not done here, but the shape would be: deploy `server/` as a small Node service (Render/Fly/Railway) with `GROQ_API_KEY` set as an environment secret, and `client/` as a static build (`npm run build` in `client/`) on Vercel/Netlify, with its API calls pointed at the deployed server's URL instead of the Vite dev proxy.
+Two separate free-tier services: the backend on Render, the frontend on Vercel.
+
+**1. Push this repo to GitHub first** (you need this for submission anyway).
+
+**2. Backend — Render**
+- New → Web Service → connect your GitHub repo.
+- Root directory: `server`
+- Build command: `npm install`
+- Start command: `npm start`
+- Environment variables: `GROQ_API_KEY` (your key), `LLM_PROVIDER=groq`, `GROQ_MODEL=llama-3.3-70b-versatile`, `MOCK_MODE` left blank. Render sets `PORT` itself — the server already reads `process.env.PORT`.
+- Deploy, then copy the resulting URL (looks like `https://your-service.onrender.com`).
+
+**3. Frontend — Vercel**
+- New Project → import the same repo.
+- Root directory: `client`
+- Framework preset: Vite (build command `npm run build`, output dir `dist` — Vercel usually detects this automatically).
+- Environment variable: `VITE_API_BASE_URL` = the Render URL from step 2 (no trailing slash).
+- Deploy. Vercel gives you the public URL — that's your submission link.
+
+Note: `client/src/api.js` reads `VITE_API_BASE_URL` at build time and falls back to relative `/api/...` calls (which only work via the local Vite dev proxy) when it's unset — so local dev needs no config, but a production build does need that env var set on Vercel or every request will 404.
 
 ## Screen recording
 
