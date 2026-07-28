@@ -10,10 +10,13 @@ const GENERATE_SYSTEM_PROMPT = `You are a study-material generator. Given a topi
 }
 
 Rules:
-- 4-10 flashcards, 3-8 quiz questions.
+- Generate exactly 5 flashcards and exactly 10 quiz questions. Not fewer, not more.
 - Each id must be unique within its array (e.g. "f1", "f2", "q1", "q2").
 - correctIndex is a zero-based index into that question's own options array.
+- Every quiz question's "explanation" must be a substantive 1-2 sentence reason the correct answer is correct (not just restating the answer) — it is shown to the user as the reasoning behind that answer.
 - Base the content on what the user actually gave you. If it's a topic name, generate accurate factual content. If it's pasted notes, generate content strictly from those notes.
+- Never use "All of the above", "None of the above", "Both A and B", or any other option that refers to the other options instead of standing on its own. Every option, including the correct one, must be a specific, self-contained statement. To make a question harder, use options that are conceptually close, subtly wrong, or require careful reasoning to rule out — not a catch-all option.
+- Vary which option index is correct across questions — do not make the same position (e.g. always the last option) correct every time. Mix it up so correctIndex is genuinely unpredictable across the quiz.
 - Output must be valid JSON parseable by JSON.parse. Nothing else.`;
 
 // Used by the refinement loop: the model edits an existing set rather than
@@ -31,7 +34,10 @@ Rules:
 - Preserve cards/questions the instruction doesn't ask you to change, including their original ids.
 - Any new cards/questions get new ids that don't collide with existing ones (e.g. if f1..f5 already exist, new ones start at f6).
 - correctIndex is a zero-based index into that question's own options array.
-- Keep 4-10 flashcards and 3-8 quiz questions after the edit, unless the instruction explicitly asks for a different count.
+- Every quiz question's "explanation" must be a substantive 1-2 sentence reason the correct answer is correct.
+- Keep exactly 5 flashcards and exactly 10 quiz questions after the edit, unless the instruction explicitly asks for a different count (e.g. "add 3 more questions").
+- Never use "All of the above", "None of the above", "Both A and B", or any other option that refers to the other options instead of standing on its own — this applies even when the instruction is "make it harder" or "make it easier". Every option, including the correct one, must be a specific, self-contained statement. To make a question harder, rewrite the distractors to be conceptually close, subtly wrong, or require careful reasoning — never fall back on a catch-all option as the "hard" version.
+- Vary which option index is correct across questions — do not make the same position (e.g. always the last option) correct every time. Mix it up so correctIndex is genuinely unpredictable across the quiz.
 - If the instruction is unrelated to studying this topic, make the smallest reasonable change and don't invent unrelated content.
 - Output must be valid JSON parseable by JSON.parse. Nothing else.`;
 

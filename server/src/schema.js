@@ -26,8 +26,22 @@ export const StudySetSchema = z.object({
       })
     )
     .min(3)
-    .max(15),
+    .max(25),
 });
+
+// Catch-all options ("All of the above", "None of the above", "Both A and
+// C", etc.) let the model dodge writing real distractors — most often as
+// its lazy go-to for "make this harder". Matched loosely (case/whitespace
+// insensitive) so we reject the whole response and force the one retry
+// llmClient.js already does, rather than let this reach the UI.
+const LAZY_OPTION_PATTERNS = [
+  /^all of the (above|following|these)\.?$/i,
+  /^none of the (above|following|these)\.?$/i,
+  /^all( of the)? options?( (are|is))? correct\.?$/i,
+  /^none( of the options)?( (are|is))? correct\.?$/i,
+  /^both\s+[a-e]\s+and\s+[a-e]\.?$/i, // e.g. "Both A and C"
+];
+const isLazyOption = (opt) => LAZY_OPTION_PATTERNS.some((re) => re.test(opt.trim()));
 
 // zod validates correctIndex is a non-negative int, but it can't validate
 // "correctIndex is actually inside the options array" on its own — do that
@@ -41,6 +55,13 @@ export function validateStudySet(candidate) {
   const badQuestion = result.data.quiz.find((q) => q.correctIndex >= q.options.length);
   if (badQuestion) {
     return { ok: false, error: `quiz question "${badQuestion.id}" has correctIndex out of range` };
+  }
+  const lazyQuestion = result.data.quiz.find((q) => q.options.some(isLazyOption));
+  if (lazyQuestion) {
+    return {
+      ok: false,
+      error: `quiz question "${lazyQuestion.id}" uses a catch-all option (e.g. "All of the above") instead of a self-contained answer`,
+    };
   }
   return { ok: true, data: result.data };
 }
