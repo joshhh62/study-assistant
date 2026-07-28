@@ -1,9 +1,10 @@
 import { useRef, useState, useCallback } from "react";
-import { generateStudySet, refineStudySet, ApiError } from "./api";
+import { generateStudySet, generateStudySetFromPdf, refineStudySet, ApiError } from "./api";
 import * as storage from "./storage";
 import InputScreen from "./components/InputScreen";
 import ResultsView from "./components/ResultsView";
 import "./App.css";
+import "./components/PdfUpload.css"; // pdf-upload__notice, shown above ResultsView after a truncated PDF generate
 
 export default function App() {
   const [input, setInput] = useState("");
@@ -11,6 +12,10 @@ export default function App() {
   const [session, setSession] = useState(null); // { id, topic, studySet, schedule, createdAt, updatedAt }
   const [errorMessage, setErrorMessage] = useState(null);
   const [sessions, setSessions] = useState(() => storage.listSessions());
+  // Set when a PDF generate response came back truncated (PDF text longer
+  // than the server's input cap) — surfaced as a small note above the
+  // results once that session is showing. Text submits never set this.
+  const [pdfNotice, setPdfNotice] = useState(null);
 
   // Refine has its own, separate request state from the main generate flow
   // on purpose: a refine that's loading or fails should never blank out or
@@ -29,6 +34,37 @@ export default function App() {
   const refineRequestIdRef = useRef(0);
   const refineAbortRef = useRef(null);
 
+  // Shared tail of "start a new generate request": awaits whichever promise
+  // the caller kicked off (text or PDF), applies the stale-response guard,
+  // and on success creates a session / on failure surfaces an error message.
+  // submit() and submitPdf() are alternate entry points into the same
+  // action — mutually exclusive with each other, same as submit() already
+  // is with itself — so they share requestIdRef/abortRef/status here rather
+  // than each having their own.
+  const finishGenerate = useCallback(async (requestId, promise) => {
+    try {
+      const data = await promise;
+      if (requestId !== requestIdRef.current) return; // a newer request already took over
+      const newSession = storage.createSession(data);
+      setSession(newSession);
+      setSessions(storage.listSessions());
+      // Only PDF-sourced data ever carries `truncated`; text submits leave
+      // this cleared.
+      setPdfNotice(
+        data.truncated
+          ? "Your PDF was long, so only the first part of it was used to generate this set."
+          : null
+      );
+      setStatus("success");
+    } catch (err) {
+      if (err.name === "AbortError") return; // cancelled on purpose (superseded or start-over)
+      if (requestId !== requestIdRef.current) return;
+      const message = err instanceof ApiError ? err.message : "Something unexpected happened. Try again.";
+      setErrorMessage(message);
+      setStatus("error");
+    }
+  }, []);
+
   const submit = useCallback(async (text) => {
     const trimmed = text.trim();
     if (!trimmed || status === "loading") return;
@@ -41,21 +77,24 @@ export default function App() {
     setStatus("loading");
     setErrorMessage(null);
 
-    try {
-      const data = await generateStudySet(trimmed, { signal: controller.signal });
-      if (requestId !== requestIdRef.current) return; // a newer request already took over
-      const newSession = storage.createSession(data);
-      setSession(newSession);
-      setSessions(storage.listSessions());
-      setStatus("success");
-    } catch (err) {
-      if (err.name === "AbortError") return; // cancelled on purpose (superseded or start-over)
-      if (requestId !== requestIdRef.current) return;
-      const message = err instanceof ApiError ? err.message : "Something unexpected happened. Try again.";
-      setErrorMessage(message);
-      setStatus("error");
-    }
-  }, [status]);
+    await finishGenerate(requestId, generateStudySet(trimmed, { signal: controller.signal }));
+  }, [status, finishGenerate]);
+
+  // PDF counterpart to submit(): identical request lifecycle, just backed
+  // by generateStudySetFromPdf() instead of generateStudySet().
+  const submitPdf = useCallback(async (file) => {
+    if (!file || status === "loading") return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestId = ++requestIdRef.current;
+
+    setStatus("loading");
+    setErrorMessage(null);
+
+    await finishGenerate(requestId, generateStudySetFromPdf(file, { signal: controller.signal }));
+  }, [status, finishGenerate]);
 
   const reset = useCallback(() => {
     abortRef.current?.abort();
@@ -68,6 +107,7 @@ export default function App() {
     setRefineStatus("idle");
     setRefineError(null);
     setInput("");
+    setPdfNotice(null);
   }, []);
 
   const openSession = useCallback((id) => {
@@ -78,6 +118,7 @@ export default function App() {
     setErrorMessage(null);
     setRefineStatus("idle");
     setRefineError(null);
+    setPdfNotice(null); // reopening a past session isn't a fresh PDF submit
   }, []);
 
   const removeSession = useCallback((id) => {
@@ -139,19 +180,23 @@ export default function App() {
 
       <main className="app-main">
         {status === "success" && session ? (
-          <ResultsView
-            session={session}
-            onStartOver={reset}
-            onRefine={handleRefine}
-            refineStatus={refineStatus}
-            refineError={refineError}
-            onCardReview={handleCardReview}
-          />
+          <>
+            {pdfNotice && <p className="pdf-upload__notice">{pdfNotice}</p>}
+            <ResultsView
+              session={session}
+              onStartOver={reset}
+              onRefine={handleRefine}
+              refineStatus={refineStatus}
+              refineError={refineError}
+              onCardReview={handleCardReview}
+            />
+          </>
         ) : (
           <InputScreen
             input={input}
             onInputChange={setInput}
             onSubmit={submit}
+            onSubmitPdf={submitPdf}
             status={status}
             errorMessage={errorMessage}
             sessions={sessions}

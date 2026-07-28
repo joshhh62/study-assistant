@@ -2,6 +2,7 @@ import { useState } from "react";
 import LoadingState from "./LoadingState";
 import ErrorState from "./ErrorState";
 import { dueCardCount, formatRelativeTime } from "../storage";
+import "./PdfUpload.css";
 
 const EXAMPLES = [
   "Photosynthesis — light and dark reactions",
@@ -13,6 +14,7 @@ export default function InputScreen({
   input,
   onInputChange,
   onSubmit,
+  onSubmitPdf,
   status,
   errorMessage,
   sessions,
@@ -20,6 +22,11 @@ export default function InputScreen({
   onDeleteSession,
 }) {
   const [touched, setTouched] = useState(false);
+  const [pdfFile, setPdfFile] = useState(null);
+  // Tracks which form last fired, so the shared ErrorState's "Try again"
+  // retries the right thing instead of always re-submitting the textarea
+  // (which could be empty if the PDF form is what actually failed).
+  const [lastSubmitKind, setLastSubmitKind] = useState("text");
   const isLoading = status === "loading";
   const trimmedEmpty = input.trim().length === 0;
 
@@ -27,6 +34,7 @@ export default function InputScreen({
     e.preventDefault();
     setTouched(true);
     if (trimmedEmpty || isLoading) return;
+    setLastSubmitKind("text");
     onSubmit(input);
   }
 
@@ -34,6 +42,25 @@ export default function InputScreen({
   function handleKeyDown(e) {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       handleSubmit(e);
+    }
+  }
+
+  function handlePdfChange(e) {
+    setPdfFile(e.target.files?.[0] || null);
+  }
+
+  function handlePdfSubmit(e) {
+    e.preventDefault();
+    if (!pdfFile || isLoading) return;
+    setLastSubmitKind("pdf");
+    onSubmitPdf(pdfFile);
+  }
+
+  function handleRetry() {
+    if (lastSubmitKind === "pdf" && pdfFile) {
+      onSubmitPdf(pdfFile);
+    } else {
+      onSubmit(input);
     }
   }
 
@@ -81,8 +108,39 @@ export default function InputScreen({
         <p className="input-shortcut-hint">Tip: Ctrl/Cmd + Enter to submit</p>
       </form>
 
+      {/* Alternate entry point into the same generate action — hidden while
+          a request (from either form) is already in flight. */}
+      {!isLoading && (
+        <div className="pdf-upload">
+          <div className="pdf-upload__divider">
+            <span>or upload a PDF</span>
+          </div>
+          <form onSubmit={handlePdfSubmit} className="pdf-upload__form">
+            <label htmlFor="pdf-input" className="btn btn--secondary pdf-upload__label">
+              {pdfFile ? "Choose a different PDF" : "Choose a PDF file"}
+            </label>
+            <input
+              id="pdf-input"
+              type="file"
+              accept="application/pdf"
+              className="pdf-upload__input"
+              onChange={handlePdfChange}
+              disabled={isLoading}
+            />
+            {pdfFile && (
+              <div className="pdf-upload__selected">
+                <span className="pdf-upload__filename">{pdfFile.name}</span>
+                <button type="submit" className="btn btn--primary">
+                  Generate from PDF
+                </button>
+              </div>
+            )}
+          </form>
+        </div>
+      )}
+
       {status === "loading" && <LoadingState />}
-      {status === "error" && <ErrorState message={errorMessage} onRetry={() => onSubmit(input)} />}
+      {status === "error" && <ErrorState message={errorMessage} onRetry={handleRetry} />}
 
       {status === "idle" && sessions.length > 0 && (
         <div className="session-history">
