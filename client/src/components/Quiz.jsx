@@ -5,12 +5,26 @@ export default function Quiz({ questions }) {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState(null); // option index chosen for current question
   const [locked, setLocked] = useState(false); // true once an answer has been submitted
-  const [results, setResults] = useState({}); // question id -> boolean (correct?)
+  const [results, setResults] = useState({}); // question id -> { correct: boolean, selectedIndex: number }
   const [roundNumber, setRoundNumber] = useState(1);
 
   const total = round.length;
   const current = round[index];
   const finished = index >= total;
+
+  // Resync when the underlying question set changes out from under us —
+  // e.g. a refine ("make it harder", "add 3 more questions") replaces
+  // studySet.quiz with a new array while this tab is still mounted. Without
+  // this, `round` (only ever initialized once via useState) would keep
+  // showing the old questions even though the refine succeeded.
+  useEffect(() => {
+    setRound(questions);
+    setIndex(0);
+    setSelected(null);
+    setLocked(false);
+    setResults({});
+    setRoundNumber(1);
+  }, [questions]);
 
   function choose(optionIndex) {
     if (locked) return;
@@ -20,7 +34,7 @@ export default function Quiz({ questions }) {
   function submitAnswer() {
     if (selected === null || locked) return;
     const correct = selected === current.correctIndex;
-    setResults((r) => ({ ...r, [current.id]: correct }));
+    setResults((r) => ({ ...r, [current.id]: { correct, selectedIndex: selected } }));
     setLocked(true);
   }
 
@@ -55,10 +69,11 @@ export default function Quiz({ questions }) {
   }, [locked, selected, current, finished]);
 
   const wrongQuestions = useMemo(
-    () => round.filter((q) => results[q.id] === false),
+    () => round.filter((q) => results[q.id]?.correct === false),
     [round, results]
   );
-  const correctCount = round.filter((q) => results[q.id] === true).length;
+  const correctCount = round.filter((q) => results[q.id]?.correct === true).length;
+  const scorePercent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
   function retestWrong() {
     if (wrongQuestions.length === 0) return;
@@ -82,6 +97,7 @@ export default function Quiz({ questions }) {
   if (finished) {
     return (
       <div className="quiz quiz--summary">
+        <p className="quiz__score-percent">{scorePercent}%</p>
         <p className="quiz__score">
           {correctCount} / {total} correct{roundNumber > 1 ? ` (retest round ${roundNumber})` : ""}
         </p>
@@ -96,6 +112,32 @@ export default function Quiz({ questions }) {
           </button>
         </div>
         {wrongQuestions.length === 0 && <p className="quiz__perfect">All correct this round.</p>}
+
+        <div className="quiz__review">
+          <h3 className="quiz__review-title">Answer summary</h3>
+          {round.map((q, i) => {
+            const result = results[q.id];
+            const isCorrect = result?.correct === true;
+            const yourAnswer = result ? q.options[result.selectedIndex] : null;
+            const correctAnswer = q.options[q.correctIndex];
+            return (
+              <div
+                key={q.id}
+                className={`quiz__review-item ${isCorrect ? "quiz__review-item--correct" : "quiz__review-item--wrong"}`}
+              >
+                <p className="quiz__review-question">
+                  <span className="quiz__review-badge">{isCorrect ? "Correct" : "Wrong"}</span>
+                  {i + 1}. {q.question}
+                </p>
+                {!isCorrect && (
+                  <p className="quiz__review-your-answer">Your answer: {yourAnswer}</p>
+                )}
+                <p className="quiz__review-correct-answer">Correct answer: {correctAnswer}</p>
+                <p className="quiz__review-explanation">{q.explanation}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   }
