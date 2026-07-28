@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import multer from "multer";
+import pdfParse from "pdf-parse";
 import { generateStudySet, refineStudySet, LLMError } from "./llmClient.js";
 import { validateStudySet } from "./schema.js";
 
@@ -10,6 +12,15 @@ app.use(express.json({ limit: "150kb" }));
 
 const PORT = process.env.PORT || 3001;
 const REQUEST_TIMEOUT_MS = 25000;
+const MAX_INPUT_CHARS = 8000;
+
+// Memory storage only — no disk writes, keeping the server stateless like
+// the rest of it. The file never touches disk; it's parsed straight out of
+// the buffer and discarded once the request finishes.
+const pdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+});
 
 function readConfig() {
   return {
@@ -73,11 +84,73 @@ app.post("/api/generate", async (req, res) => {
   if (!input) {
     return res.status(400).json({ error: "empty_input", message: "Paste some notes or a topic first." });
   }
-  if (input.length > 8000) {
+  if (input.length > MAX_INPUT_CHARS) {
     return res.status(400).json({ error: "input_too_long", message: "Keep it under 8000 characters." });
   }
 
   await runLLMRequest(res, (signal) => generateStudySet({ input, config: readConfig(), signal }));
+});
+
+// Same generation pipeline as /api/generate, but the input text comes from
+// an uploaded PDF instead of typed/pasted text. Once the text is extracted
+// this funnels into the exact same generateStudySet() call — same prompts,
+// same mock-mode behavior, same retry-on-invalid-output logic — so the two
+// entry points stay 100% consistent. Extraction itself is never mocked; it
+// always genuinely parses the uploaded file.
+app.post("/api/generate-pdf", (req, res) => {
+  pdfUpload.single("pdf")(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      if (uploadErr.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ error: "file_too_large", message: "PDF must be under 15MB." });
+      }
+      // Any other multer error (bad multipart data, unexpected field, etc.)
+      // — fail clearly instead of letting it crash into a raw 500.
+      console.error("PDF upload error:", uploadErr);
+      return res.status(400).json({ error: "upload_failed", message: "Couldn't process the uploaded file." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "empty_input", message: "Choose a PDF file to upload first." });
+    }
+    if (req.file.mimetype !== "application/pdf") {
+      return res.status(400).json({ error: "invalid_file_type", message: "Please upload a PDF file." });
+    }
+
+    let extractedText;
+    try {
+      const parsed = await pdfParse(req.file.buffer);
+      extractedText = (parsed.text || "").trim();
+    } catch (err) {
+      console.error("PDF parse error:", err);
+      return res.status(400).json({
+        error: "pdf_parse_failed",
+        message: "Couldn't read that PDF. It may be corrupted or password-protected.",
+      });
+    }
+
+    // Common for scanned/image-only PDFs with no text layer — there's no
+    // OCR here, so fail clearly and point the user at the manual path
+    // rather than silently generating from nothing.
+    if (!extractedText) {
+      return res.status(400).json({
+        error: "pdf_no_text",
+        message:
+          "Couldn't find any text in that PDF — it might be a scanned image without a text layer. Try pasting the notes directly instead.",
+      });
+    }
+
+    // Matches /api/generate's input limit, but truncates instead of
+    // rejecting outright — a long PDF shouldn't dead-end the user. The
+    // `truncated` flag rides along in the success response so the frontend
+    // can surface a small "only used the first part of your PDF" note.
+    const truncated = extractedText.length > MAX_INPUT_CHARS;
+    const input = truncated ? extractedText.slice(0, MAX_INPUT_CHARS) : extractedText;
+
+    await runLLMRequest(res, async (signal) => {
+      const data = await generateStudySet({ input, config: readConfig(), signal });
+      return truncated ? { ...data, truncated: true } : data;
+    });
+  });
 });
 
 // Refinement loop: edits an existing study set per a free-text instruction
