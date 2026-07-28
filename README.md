@@ -1,6 +1,6 @@
 # Study Assistant
 
-Paste your notes, or just name a topic. An LLM turns it into flashcards and a quiz — flip through cards, take the quiz, and retest whatever you got wrong. Beyond the core assignment, it also supports refining a set with follow-up instructions, saves sessions locally so you can pick up later, and schedules flashcard review with spaced repetition.
+Paste your notes, name a topic, or upload a PDF. An LLM turns it into 5 flashcards and a 10-question quiz — flip through cards, take the quiz, and retest whatever you got wrong, with a color-coded score summary and per-question reasoning at the end. Beyond the core assignment, it also supports refining a set with follow-up instructions, saves sessions locally so you can pick up later, and schedules flashcard review with spaced repetition.
 
 Built for the Flam frontend internship assignment (Study Assistant option).
 
@@ -17,11 +17,11 @@ npm install
 npm start
 ```
 
-`npm install` installs the root, `client/`, and `server/` dependencies (via a `postinstall` hook). `npm start` runs the Express API (port 3001) and the Vite dev server (port 5173) together, with `/api/*` proxied from the client to the server. Open **http://localhost:5173**.
+`npm install` installs the root, `client/`, and `server/` dependencies, and its `postinstall` hook also creates `server/.env` from `server/.env.example` if one doesn't exist yet (with `MOCK_MODE=true`, so there's nothing to configure before the first run). `npm start` runs the Express API (port 3001) and the Vite dev server (port 5173) together, with `/api/*` proxied from the client to the server. Open **http://localhost:5173**.
 
 ### Using a real LLM
 
-By default the server runs in **mock mode** (see `server/.env`) so you can try the app immediately with no API key. To use a real model:
+By default `server/.env` (auto-created on install) has `MOCK_MODE=true`, so the app works immediately with no API key. To use a real model:
 
 1. Get a free key at [console.groq.com/keys](https://console.groq.com/keys).
 2. In `server/.env`, set `GROQ_API_KEY=your-key` and clear `MOCK_MODE=` (leave it blank).
@@ -46,12 +46,12 @@ client/   Vite + React frontend
 server/   Express API — the only thing that talks to the LLM
 ```
 
-- `server/src/llmClient.js` — calls Groq's OpenAI-compatible chat completions endpoint with `response_format: json_object`, strips markdown fences the model sometimes adds anyway, parses, and validates against a schema. On invalid output, it retries **once** with a fresh call before giving up. Exports `generateStudySet` (fresh generation) and `refineStudySet` (edits an existing set per an instruction) — both go through the same `attemptWithRetry`/validation pipeline.
-- `server/src/schema.js` — a Zod schema for the exact shape the frontend expects, plus a hand-written check that each quiz question's `correctIndex` actually falls inside its own `options` array (Zod alone can't express that cross-field constraint).
-- `server/src/index.js` — two routes: `POST /api/generate` and `POST /api/refine`. Validates input, bounds each request to 25s, maps internal error codes to HTTP status + a user-facing message.
-- `client/src/App.jsx` — owns request state (`idle | loading | success | error`) for generation, a *separate* `refineStatus`/`refineError` pair for the refinement loop (so a failed refine never blanks out the study set you already have), and the stale-response guards for both (see below).
+- `server/src/llmClient.js` — calls Groq's OpenAI-compatible chat completions endpoint with `response_format: json_object`, strips markdown fences the model sometimes adds anyway, parses, and validates against a schema. On invalid output, it retries **once** with a fresh call before giving up. Exports `generateStudySet` (fresh generation) and `refineStudySet` (edits an existing set per an instruction) — both go through the same `attemptWithRetry`/validation pipeline, and both are also used by the PDF route below (PDF generation is just `generateStudySet` given PDF-extracted text as input).
+- `server/src/schema.js` — a Zod schema for the exact shape the frontend expects, plus hand-written checks Zod alone can't express: each quiz question's `correctIndex` actually falls inside its own `options` array, and no option is a lazy catch-all like "All of the above" / "Both A and C" (the model's instructions say not to do this, but a failed schema check forces the one retry rather than trusting the prompt alone).
+- `server/src/index.js` — three routes: `POST /api/generate`, `POST /api/refine`, and `POST /api/generate-pdf` (multipart upload, extracts text with `pdf-parse`, then reuses the same generation pipeline), plus `GET /api/health`. Validates input, bounds each request to 25s, maps internal error codes to HTTP status + a user-facing message.
+- `client/src/App.jsx` — owns request state (`idle | loading | success | error`) for generation (shared between the text and PDF submit paths via a common `finishGenerate` helper), a *separate* `refineStatus`/`refineError` pair for the refinement loop (so a failed refine never blanks out the study set you already have), and the stale-response guards for both (see below).
 - `client/src/storage.js` — localStorage-backed session persistence and Leitner-box spaced-repetition scheduling. Pure functions, unit-tested with a Node localStorage shim (see commit history).
-- `client/src/components/` — `InputScreen` (+ session history list), `Flashcards` (+ due-first ordering), `Quiz`, `RefineBar`, plus small `LoadingState`/`ErrorState` pieces.
+- `client/src/components/` — `InputScreen` (+ session history list + PDF upload), `Flashcards` (+ due-first ordering), `Quiz` (+ scored summary with per-question reasoning), `RefineBar`, plus small `LoadingState`/`ErrorState` pieces.
 
 ## Handling bad AI output
 
@@ -68,7 +68,9 @@ This was the main point of the assignment, so specifically:
 
 ## Beyond the core assignment
 
-Three additions past the required scope, picked because they demonstrate something specific rather than just adding surface area:
+Four additions past the required scope, picked because they demonstrate something specific rather than just adding surface area:
+
+**PDF upload** (`POST /api/generate-pdf`, `client/src/components/PdfUpload.css`). Upload a PDF instead of pasting notes — the server extracts text server-side with `pdf-parse` (memory-only via `multer`, nothing written to disk), then runs it through the exact same generation pipeline as a text submit. Handles the realistic failure modes explicitly rather than a generic 500: non-PDF file, empty/scanned/image-only PDF (no OCR — a clear message says so instead of pretending it worked), oversized upload, and PDFs whose text is long enough that it gets truncated before hitting the LLM (surfaced to the user as a small notice, not silently).
 
 **Refinement loop** (`client/src/components/RefineBar.jsx`, `POST /api/refine`). Follow-up instructions edit the existing set instead of regenerating from scratch — quick-action buttons ("Make it harder", "Make it easier", "Add 3 more questions") plus a free-text box for anything else. The backend prompt tells the model to preserve unchanged cards' ids and only add new ones past the existing range, so a refine reads as an edit, not a fresh generation. It has its own request state, deliberately separate from the main generate flow (`refineStatus`/`refineError` in `App.jsx`) — a failed or in-flight refine never blanks out the study set already on screen, and it gets the same stale-response guard (its own request-id ref + `AbortController`) as the initial generation.
 
@@ -84,7 +86,7 @@ Three additions past the required scope, picked because they demonstrate somethi
 - No streaming — the full response is generated server-side before anything renders, for both generate and refine. Simpler to reason about, but a loading spinner is the only feedback during generation. Streaming was on the stretch list and would pair naturally with the refine loop (streaming a diff instead of a full replacement) but wasn't built.
 - The one retry on invalid output is a flat retry with the same prompt, not a corrective retry that tells the model what it got wrong. A corrective retry (feeding the parse/validation error back to the model) would likely have a higher success rate. This applies to both `/api/generate` and `/api/refine`.
 - Refine has no undo — if an instruction produces something you don't want, there's no way back to the pre-refine set short of "Start over" (which loses the whole session, not just the last edit).
-- Deploy: not deployed yet (optional per the assignment) — runs locally via `npm start`. See "Deploying" below if you want to.
+- PDF upload has no OCR — scanned/image-only PDFs return a clear "couldn't read that PDF" error rather than silently producing an empty study set, but their text genuinely can't be extracted. Very long PDFs are also truncated to a fixed character cap before being sent to the model (the UI tells you when this happened).
 - Test coverage is one script (`client/src/storage.test.mjs`) for the spaced-repetition/session logic — no tests for the React components or the Express routes. Verification there is manual + the mock-mode paths described above.
 
 ## AI usage note
@@ -95,7 +97,7 @@ This project was built with substantial help from Claude (Anthropic's AI assista
 
 ## Time spent
 
-_Fill in your actual time before submitting_ — the brief asks for total time spent including review. As a starting point: the initial build (scaffold → backend → input screen → flashcards → quiz → mobile pass → README) took a few focused hours with AI assistance, and the three bonus features (refinement loop, sessions, spaced repetition) took another pass on top of that. Add whatever time you spend reading, testing, and adjusting it yourself — that time counts too and is worth logging honestly.
+Roughly 9-12 hours total, across the initial build (scaffold → backend → input screen → flashcards → quiz → mobile pass → README), the three original bonus features (refinement loop, sessions, spaced repetition), and a later round of upgrades (flashcard/quiz count increase, scored results summary, the book/study theme, PDF upload, and bug fixes found along the way — including the quiz tab not refreshing after a refine, and the refine loop occasionally falling back to lazy "All of the above"-style answers).
 
 ## Deploying (optional but preferred)
 
