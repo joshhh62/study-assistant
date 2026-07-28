@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "AI study assistant: paste notes or a topic, get flashcards and a quiz you can actually use.",
   "scripts": {
-    "postinstall": "npm install --prefix server && npm install --prefix client",
+    "postinstall": "npm install --prefix server && npm install --prefix client && node -e \"const fs=require('fs'); if(!fs.existsSync('server/.env')) fs.copyFileSync('server/.env.example','server/.env')\"",
     "start": "concurrently -k -n SERVER,CLIENT -c blue,green \"npm run start --prefix server\" \"npm run dev --prefix client\"",
     "server": "npm run start --prefix server",
     "client": "npm run dev --prefix client",
