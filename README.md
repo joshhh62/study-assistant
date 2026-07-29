@@ -124,4 +124,4 @@ Note: `client/src/api.js` reads `VITE_API_BASE_URL` at build time and falls back
 
 ## Screen recording
 
-_Add a link here before submitting_ — a short recording showing: entering a topic, generating, flipping through flashcards, taking the quiz, and hitting an error state (e.g. with `MOCK_MODE=broken`) to show the failure handling working.
+[Demo video](https://drive.google.com/file/d/1HC5ZhGt4FiB5FCX07MnvOTQBg5LlWupd/view?usp=sharing) — a short recording showing the app working: entering a topic, generating, flipping through flashcards, taking the quiz, and the failure-handling paths in action.
