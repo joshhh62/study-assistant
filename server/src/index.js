@@ -2,7 +2,15 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import pdfParse from "pdf-parse";
+// Import the library's inner implementation directly, not the "pdf-parse"
+// package entry point. That entry point (pdf-parse/index.js) has a
+// module-level self-test guarded by `!module.parent` that's meant to only
+// run when the package is executed directly — but under Node's ESM loader
+// `module.parent` is unreliable, so the guard misfires and the self-test
+// runs (and throws, since its own fixture file isn't guaranteed to be
+// present) as a side effect of just importing the package. Importing the
+// inner module skips that entirely and gives the exact same parse function.
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { generateStudySet, refineStudySet, LLMError } from "./llmClient.js";
 import { validateStudySet } from "./schema.js";
 
@@ -180,8 +188,16 @@ app.post("/api/refine", async (req, res) => {
   );
 });
 
-app.listen(PORT, () => {
-  console.log(`Study Assistant API listening on http://localhost:${PORT}`);
-  const mock = process.env.MOCK_MODE;
-  if (mock) console.log(`MOCK_MODE=${mock} — not calling a real LLM.`);
-});
+// On Vercel this module is loaded by api/index.js as a serverless function —
+// there's no port to bind and Vercel calls the exported app directly per
+// request. Only start a real listening server for local dev or a
+// traditional always-on host.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Study Assistant API listening on http://localhost:${PORT}`);
+    const mock = process.env.MOCK_MODE;
+    if (mock) console.log(`MOCK_MODE=${mock} — not calling a real LLM.`);
+  });
+}
+
+export default app;
