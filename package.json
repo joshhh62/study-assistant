@@ -1,5 +1,5 @@
 {
-  "name": "flam-study-assistant",
+  "name": "study-assistant",
   "private": true,
   "version": "1.0.0",
   "description": "AI study assistant: paste notes or a topic, get flashcards and a quiz you can actually use.",

@@ -118,7 +118,3 @@ Frontend — Vercel
 - Deploy. Vercel gives you the public URL.
 
 Note: client/src/api.js reads VITE_API_BASE_URL at build time and falls back to relative /api/... calls (which only work via the local Vite dev proxy) when it's unset — so local dev needs no config, but a production build does need that env var set on Vercel or every request will 404.
-
-## Built with AI assistance
-
-This project was built with substantial help from Claude (Anthropic's AI assistant) as a coding agent — scaffolding, the backend/schema work, the React components, and this README — alongside my own direction and review throughout.
